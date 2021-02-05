@@ -1,14 +1,13 @@
 from pandas import DataFrame, Series
 from scipy.io import arff
 from os import path
-from sktime.utils.load_data import load_from_arff_to_dataframe
+from sktime.utils.data_io import load_from_arff_to_dataframe
 
 def format_dataset(data, err, is_relative_err=False):
     ts_formatted = DataFrame()
     udata = []
     if is_relative_err:
         for i, row in data[data.columns[:-1]].iterrows():
-            # convert error to relative
             tmp = [(row[c], err.iloc[i][f"{c}_err"]*abs(row[c])) for c in row.index]
             udata.append(Series(tmp))
         ts_formatted["dim_0"] = udata

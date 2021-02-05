@@ -1,7 +1,8 @@
 import time
+import numpy as np
 from . import utils as ust_utils
 from .transformers import ContractedUShapeletTransform, UShapeletTransform, Flat2UncertainTransformer
-from sktime.transformers.shapelets import ContractedShapeletTransform
+from sktime.transformations.panel.shapelets import ContractedShapeletTransform
 from sklearn.naive_bayes import GaussianNB
 from sklearn.pipeline import Pipeline
 from sklearn.preprocessing import StandardScaler
@@ -11,11 +12,11 @@ from .u_number import UNumber
 
 def build_ust_dt_model(distance, seed=None, cmp_type=None, time_limit_in_mins=1, predefined_ig_rejection_level=0.05):
 	ust = ContractedUShapeletTransform(time_limit_in_mins=time_limit_in_mins, 
-																			 remove_self_similar=True, 
-																			 random_state=seed, 
-																			 cmp_type=cmp_type,
-																			 distance=distance,
-																			 predefined_ig_rejection_level=predefined_ig_rejection_level)
+									 remove_self_similar=True, 
+									 random_state=seed, 
+									 cmp_type=cmp_type,
+									 distance=distance,
+									 predefined_ig_rejection_level=predefined_ig_rejection_level)
 
 	dt = DecisionTreeClassifier(random_state=seed)
 
@@ -23,12 +24,21 @@ def build_ust_dt_model(distance, seed=None, cmp_type=None, time_limit_in_mins=1,
 	return shapelet_clf
 
 def build_ust_nb_model(distance, seed=None, cmp_type=None, time_limit_in_mins=1, predefined_ig_rejection_level=0.05, use_ugnb = True):
-	ust = ContractedUShapeletTransform(time_limit_in_mins=time_limit_in_mins, 
-																			 remove_self_similar=True, 
-																			 random_state=seed, 
-																			 cmp_type=cmp_type,
-																			 distance=distance,
-																			 predefined_ig_rejection_level=predefined_ig_rejection_level)
+	ust = None
+	if time_limit_in_mins == np.inf:
+		ust = UShapeletTransform(remove_self_similar=True, 
+								 random_state=seed, 
+								 cmp_type=cmp_type,
+								 distance=distance,
+								 predefined_ig_rejection_level=predefined_ig_rejection_level)
+	else: 
+		ust = ContractedUShapeletTransform(time_limit_in_mins=time_limit_in_mins, 
+										 remove_self_similar=True, 
+										 random_state=seed, 
+										 cmp_type=cmp_type,
+										 distance=distance,
+										 predefined_ig_rejection_level=predefined_ig_rejection_level)
+
 	components = [('st', ust), ('ss', StandardScaler())]
 		
 	if use_ugnb and distance == UShapeletTransform.UED:
@@ -63,7 +73,7 @@ def build_and_run_model(dataset_name, dataset_folder, seed, cmp_type=UNumber.SIM
 	try:
 		print(dataset_name, 'Started...')
 		start = time.time()
-		(train_X, train_y), (test_X, test_y) = ust_utils.load_uncertain_dataset(dataset_name, dataset_folder)
+		train_X, train_y, test_X, test_y = ust_utils.load_uncertain_dataset(dataset_name, dataset_folder)
 		ust_clf = build_ust_nb_model(cmp_type=cmp_type, distance=distance, seed=seed, time_limit_in_mins=time_limit_in_mins, use_ugnb=use_ugnb)
 		ust_clf.fit(train_X, train_y)
 		cp1 = time.time()

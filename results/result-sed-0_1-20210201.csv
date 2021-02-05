@@ -1,0 +1,16 @@
+dataset,distance,cmp,classifier,acc,train_duration,test_duration
+ECG200,s_ed,simple_cmp,GNB,0.8,632.22,31.42
+TwoLeadECG,s_ed,simple_cmp,GNB,0.9868305531167691,633.17,865.97
+ECGFiveDays,s_ed,simple_cmp,GNB,0.9849012775842044,648.48,1058.14
+ItalyPowerDemand,s_ed,simple_cmp,GNB,0.9591836734693877,634.1,352.11
+SonyAIBORobotSurface2,s_ed,simple_cmp,GNB,0.85099685204617,627.55,604.78
+SonyAIBORobotSurface1,s_ed,simple_cmp,GNB,0.9733777038269551,620.16,436.87
+Plane,s_ed,simple_cmp,GNB,0.9904761904761905,646.95,37.8
+Trace,s_ed,simple_cmp,GNB,1.0,623.66,36.75
+SmoothSubspace,s_ed,simple_cmp,GNB,0.8866666666666667,632.43,29.08
+BME,s_ed,simple_cmp,GNB,0.9266666666666666,651.15,240.89
+CBF,s_ed,simple_cmp,GNB,0.9766666666666667,646.55,892.9
+UMD,s_ed,simple_cmp,GNB,0.9930555555555556,665.42,184.09
+SyntheticControl,s_ed,simple_cmp,GNB,0.93,624.54,29.82
+ShapeletSim,s_ed,simple_cmp,GNB,0.9666666666666667,683.32,395.38
+Chinatown,s_ed,simple_cmp,GNB,0.9708454810495627,603.53,43.43

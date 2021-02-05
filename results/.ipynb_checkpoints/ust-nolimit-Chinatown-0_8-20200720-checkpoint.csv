@@ -1,0 +1,5 @@
+dataset,distance,cmp,acc,train_duration,test_duration
+Chinatown,ued,interval_cmp,0.924198250728863,1243.48,141.1
+Chinatown,ued,simple_cmp,0.924198250728863,1222.69,144.89
+Chinatown,ued,cdf_cmp,0.8950437317784257,2856.34,242.98
+Chinatown,ed,simple_cmp,0.9096209912536443,1158.31,137.03

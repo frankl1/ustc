@@ -51,6 +51,10 @@ class UGaussianNB(GaussianNB):
 
         return total_mu, total_var
     
+    def _validate_data(self, X, y='no_validation', reset=True,
+                       validate_separately=False, **check_params):
+        return super()._validate_data(X, y=y, reset=reset, validate_separately=validate_separately, accept_sparse='csr', allow_nd=True, ensure_2d=False)
+
     def _check_X(self, X):
         return check_array(X, accept_sparse='csr', allow_nd=True)
     
@@ -80,6 +84,7 @@ class UGaussianNB(GaussianNB):
         -------
         self : object
         """
+        
         X, y = self._check_X_y(X, y)
         if sample_weight is not None:
             sample_weight = _check_sample_weight(sample_weight, X)
@@ -199,6 +204,8 @@ if __name__ == '__main__':
     e = X[:, :, 1]
     lb = c - e
     ub = c + e
+
+    print(X.shape)
 
     # print("Lower bound:", lb,"Upper bound:", ub, sep='\n')
     new_mu = np.average((lb + ub) / 2, axis=0)

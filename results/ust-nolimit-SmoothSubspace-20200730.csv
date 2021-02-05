@@ -1,0 +1,9 @@
+dataset,distance,cmp,acc,train_duration,test_duration
+SmoothSubspace0_4,ued,interval_cmp,0.84,35816.73,288.91
+SmoothSubspace0_4,ued,simple_cmp,0.84,33254.34,279.36
+SmoothSubspace0_4,ued,cdf_cmp,0.8266666666666667,237402.68,620.7
+SmoothSubspace0_4,ed,simple_cmp,0.8266666666666667,35189.02,284.75
+SmoothSubspace0_6,ued,interval_cmp,0.7666666666666667,39383.88,288.28
+SmoothSubspace0_6,ued,simple_cmp,0.7666666666666667,39473.55,284.18
+SmoothSubspace0_6,ued,cdf_cmp,0.7533333333333333,244774.32,478.54
+SmoothSubspace0_6,ed,simple_cmp,0.7466666666666667,39096.03,292.96

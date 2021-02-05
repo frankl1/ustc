@@ -8,7 +8,6 @@ from . import utils as ust_utils
 from .u_number import *
 from operator import itemgetter
 from scipy.stats import norm
-from statsmodels.tsa.api import SimpleExpSmoothing
 from itertools import zip_longest
 from sklearn.utils import check_random_state
 from sklearn.tree import DecisionTreeClassifier
@@ -17,7 +16,7 @@ from sklearn.pipeline import Pipeline
 from sklearn.base import TransformerMixin
 from sklearn.utils.multiclass import class_distribution
 from sklearn.preprocessing import FunctionTransformer
-from sktime.transformations.panel.shapelets import Shapelet, ShapeletTransform, ContractedShapeletTransform, ShapeletPQ
+from sktime.transformers.shapelets import Shapelet, ShapeletTransform, ContractedShapeletTransform, ShapeletPQ
 
 def flat2UncertainTransformer(X):
     """Convert the input to an uncertain dataset
@@ -40,9 +39,6 @@ class UShapeletTransform(ShapeletTransform):
     FOTS = 'fots'
     UED = "ued"
     ED = "ed"
-    SMOOTHED_ED = 's_ed'
-    HBD = 'hellinger_based_distance'
-    JSD = "jensen_shannon_distance"
     def __init__(self,
              min_shapelet_length=3,
              max_shapelet_length=np.inf,
@@ -129,7 +125,6 @@ class UShapeletTransform(ShapeletTransform):
         time_last_shapelet = time_taken()
 
         # for every series
-        nb_of_visited_cases = 0
         case_idx = 0
         slen = 0
         while case_idx < len(cases_to_visit):
@@ -309,8 +304,6 @@ class UShapeletTransform(ShapeletTransform):
                     print("Stopping search")
                 break
 
-            nb_of_visited_cases += 1
-
         # remove self similar here
         # for each class value
         #       get list of shapelets
@@ -339,11 +332,9 @@ class UShapeletTransform(ShapeletTransform):
 
         # warn the user if fit did not produce any valid shapelets
         if len(self.shapelets) == 0:
-            warnings.warn("No valid shapelets were extracted from this dataset after visiting " + str(nb_of_visited_cases) + " cases and calling the transform method "
+            warnings.warn("No valid shapelets were extracted from this dataset and calling the transform method "
                           "will raise an Exception. Please re-fit the transform with other data and/or "
                           "parameter options.")
-
-        return self
             
     def zscore(self, a, axis=0, ddof=0):
         zscored = []
@@ -385,10 +376,7 @@ class UShapeletTransform(ShapeletTransform):
         X = np.array([[X.iloc[r, c].values for c in range(len(X.columns))] for r in range(len(X))])  # may need to pad with nans here for uneq length, look at later
 
         nb_shapelet = len(self.shapelets)
-
-        ncols = nb_shapelet if self.distance != UShapeletTransform.UED else 2 * nb_shapelet
-
-        output = np.zeros([len(X), ncols], dtype=np.float32)
+        output = np.zeros([len(X), nb_shapelet*2], dtype=np.float32, )
 
         # for the i^th series to transform
         for i in range(0, len(X)):
@@ -411,9 +399,7 @@ class UShapeletTransform(ShapeletTransform):
                         print("Not finite", min_dist)
 
                     output[i][s] = min_dist.value
-
-                    if self.distance == UShapeletTransform.UED:
-                        output[i][s + nb_shapelet] = min_dist.err
+                    output[i][s + nb_shapelet] = min_dist.err
 
         return pd.DataFrame(output)
     
@@ -428,35 +414,9 @@ class UShapeletTransform(ShapeletTransform):
         	return self.fots(x[:,0], y[:,0])
         if self.distance == UShapeletTransform.UED:
             return self.uncertain_euclidean_distance(x, y)
-        if self.distance == UShapeletTransform.HBD:
-            return self.hellinger_distance(x, y)
-        if self.distance == UShapeletTransform.JSD:
-            return self.jensen_shannon_distance(x, y)
         return self.euclidean_distance(x[:, 0], y[:,0])
+
     
-    def hellinger_distance(self, uSeries1, uSeries2):
-        mu1, sigma1 = uSeries1[:, 0], uSeries1[:, 1]
-        mu2, sigma2 = uSeries2[:, 0], uSeries2[:, 1]
-        sum_sigma_squared = np.square(sigma1) + np.square(sigma2)
-        res = np.exp(-np.square(mu1 - mu2)/(4 * sum_sigma_squared))
-        res *= np.sqrt(2*sigma1*sigma2/sum_sigma_squared)
-        res = np.linalg.norm(1 - res)
-        return UNumber(res, 0, cmp_type=self.cmp_type)
-
-    def jensen_shannon_distance(self, uSeries1, uSeries2):
-        mu1, sigma1 = uSeries1[:, 0], uSeries1[:, 1]
-        mu2, sigma2 = uSeries2[:, 0], uSeries2[:, 1]
-        mu3 = (mu1 + mu2) / 2
-        sigma3_squared = (np.square(sigma1) + np.square(sigma2)) / 4
-        sigma3 = np.sqrt(sigma3_squared)
-        
-        D_kl_13 = np.log2(sigma3/sigma1) + (np.square(sigma1) + np.square(mu1 - mu3)) / (2 * sigma3_squared) - 0.5
-        D_kl_23 = np.log2(sigma3/sigma2) + (np.square(sigma2) + np.square(mu2 - mu3)) / (2 * sigma3_squared) - 0.5
-        
-        res = (np.linalg.norm(D_kl_13) + np.linalg.norm(D_kl_23)) / 2
-
-        return UNumber(res, 0, cmp_type=self.cmp_type)
-
     def uncertain_euclidean_distance(self, uSeries1, uSeries2):
         dist, err = 0, 0
         for u, v in zip(uSeries1, uSeries2):
@@ -472,12 +432,6 @@ class UShapeletTransform(ShapeletTransform):
             # print(u[1], v[1])
 
         return UNumber(dist, 0, cmp_type=self.cmp_type)
-
-    def smoothed_euclidean_distance(self, series1, series2):
-        smoothed1 = SimpleExpSmoothing(pd.Series(series1)).fit().fittedvalues
-        smoothed2 = SimpleExpSmoothing(pd.Series(series2)).fit().fittedvalues
-
-        return self.euclidean_distance(smoothed1, smoothed2)
 
     def autocoravariance_matrix(self, X, w, t, m = None, pad=0):
         if m is None:

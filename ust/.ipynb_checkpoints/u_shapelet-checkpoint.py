@@ -1,48 +1,22 @@
-import numpy as np
 import sys
 import time
-import warnings
 import numpy as np
 import pandas as pd
 from . import utils as ust_utils
 from .u_number import *
 from operator import itemgetter
 from scipy.stats import norm
-from statsmodels.tsa.api import SimpleExpSmoothing
 from itertools import zip_longest
 from sklearn.utils import check_random_state
 from sklearn.tree import DecisionTreeClassifier
-from sklearn.naive_bayes import GaussianNB
 from sklearn.pipeline import Pipeline
-from sklearn.base import TransformerMixin
 from sklearn.utils.multiclass import class_distribution
-from sklearn.preprocessing import FunctionTransformer
-from sktime.transformations.panel.shapelets import Shapelet, ShapeletTransform, ContractedShapeletTransform, ShapeletPQ
-
-def flat2UncertainTransformer(X):
-    """Convert the input to an uncertain dataset
-    Input
-        X: a pandas dataframe of shape (n, 2k)
-    Output:
-        U_X: a numpy array of shape (n, k, 2) such that U_X[i, j] = [X[i, j], X[i, j+k]]
-    """
-    nc = X.shape[1]//2
-    m = X[:, 0:nc]
-    e = X[:, nc:]
-    U_X = np.array([ [[m[i, j], e[i, j]] for j in range(nc)] for i in range(X.shape[0])])
-    return U_X
-
-Flat2UncertainTransformer = FunctionTransformer(func=flat2UncertainTransformer)
+from sktime.transformers.shapelets import Shapelet, ShapeletTransform, ContractedShapeletTransform, ShapeletPQ
 
 class UShapeletTransform(ShapeletTransform):
     DUST_UNIFORM = "dust_uniform"
     DUST_NORMAL = "dust_normal"
-    FOTS = 'fots'
-    UED = "ued"
-    ED = "ed"
-    SMOOTHED_ED = 's_ed'
-    HBD = 'hellinger_based_distance'
-    JSD = "jensen_shannon_distance"
+    UED = "uncertain_ed"
     def __init__(self,
              min_shapelet_length=3,
              max_shapelet_length=np.inf,
@@ -51,8 +25,10 @@ class UShapeletTransform(ShapeletTransform):
              verbose=0,
              remove_self_similar=True,
              cmp_type = None,
-             distance = "ued",
-             predefined_ig_rejection_level=0.05):
+             distance = "ued"):
+        
+        self.distance = distance
+        self.cmp_type = cmp_type
         
         super().__init__(min_shapelet_length, 
                          max_shapelet_length, 
@@ -60,12 +36,6 @@ class UShapeletTransform(ShapeletTransform):
                          random_state, 
                          verbose, 
                          remove_self_similar)
-
-        self.predefined_ig_rejection_level = predefined_ig_rejection_level
-        self.distance = distance
-        self.cmp_type = cmp_type
-
-
     def fit(self, X, y=None):
         if type(self) is ContractedShapeletTransform and self.time_limit_in_mins <= 0:
             raise ValueError("Error: time limit cannot be equal to or less than 0")
@@ -129,9 +99,7 @@ class UShapeletTransform(ShapeletTransform):
         time_last_shapelet = time_taken()
 
         # for every series
-        nb_of_visited_cases = 0
         case_idx = 0
-        slen = 0
         while case_idx < len(cases_to_visit):
 
             series_id = cases_to_visit[case_idx][0]
@@ -309,8 +277,6 @@ class UShapeletTransform(ShapeletTransform):
                     print("Stopping search")
                 break
 
-            nb_of_visited_cases += 1
-
         # remove self similar here
         # for each class value
         #       get list of shapelets
@@ -339,40 +305,40 @@ class UShapeletTransform(ShapeletTransform):
 
         # warn the user if fit did not produce any valid shapelets
         if len(self.shapelets) == 0:
-            warnings.warn("No valid shapelets were extracted from this dataset after visiting " + str(nb_of_visited_cases) + " cases and calling the transform method "
+            warnings.warn("No valid shapelets were extracted from this dataset and calling the transform method "
                           "will raise an Exception. Please re-fit the transform with other data and/or "
                           "parameter options.")
-
-        return self
             
     def zscore(self, a, axis=0, ddof=0):
         zscored = []
         for i, u_candidate in enumerate(a):
             """computer the z-score of the observation and make the error relative if not"""
             
+#             if not self.is_relative_error:
+#                 can = np.array([[o[0], o[1]/o[0]] for o in u_candidate])
+#             else:
             can = np.array([[o[0], o[1]] for o in u_candidate])
             
             j = can[:, 0]
-
-            # save error in relative
-            relative_errors = can[:, 1] 
-            relative_errors[j > 0] /= j[j > 0]
-            
+            errors = can[:, 1]
+            # j = np.asanyarray(j)
             sstd = np.std(j, axis=axis, ddof=ddof)
 
             # special case - if shapelet is a straight line (i.e. no variance), zscore ver should be np.zeros(len(a))
             if sstd == 0:
-                zscored.append(np.array(pd.Series([(0,0)]*j.shape[0])))
+                zscored.append(pd.Series((0, 0)) for i in range(j.shape[0]))
             else:
                 mns = np.mean(j, axis=axis)
                 if axis and mns.ndim < j.ndim:
                     score = ((j - np.expand_dims(mns, axis=axis)) /
                                     np.expand_dims(sstd, axis=axis))
+                    score_err = ((errors - np.expand_dims(mns, axis=axis)) /
+                                    np.expand_dims(sstd, axis=axis))
                 else:
                     score = (j - mns) / sstd
-
-                errors = np.abs(np.multiply(relative_errors, score)) # convert the error back to absolute
-                zscored.append(pd.Series(zip(score, errors)).values)
+                    score_err = (errors - mns) / sstd
+                    
+                zscored.append(pd.Series(zip(score, score_err)).values)
         zscored = np.array(zscored)
         return zscored 
     
@@ -385,10 +351,7 @@ class UShapeletTransform(ShapeletTransform):
         X = np.array([[X.iloc[r, c].values for c in range(len(X.columns))] for r in range(len(X))])  # may need to pad with nans here for uneq length, look at later
 
         nb_shapelet = len(self.shapelets)
-
-        ncols = nb_shapelet if self.distance != UShapeletTransform.UED else 2 * nb_shapelet
-
-        output = np.zeros([len(X), ncols], dtype=np.float32)
+        output = np.zeros([len(X), nb_shapelet*2], dtype=np.float32, )
 
         # for the i^th series to transform
         for i in range(0, len(X)):
@@ -407,117 +370,38 @@ class UShapeletTransform(ShapeletTransform):
                     dist.value = 1.0/this_shapelet_length*dist.value
                     min_dist = min(min_dist, dist)
 
-                    if not np.isfinite(min_dist.value) or not np.isfinite(min_dist.err):
-                        print("Not finite", min_dist)
-
                     output[i][s] = min_dist.value
-
-                    if self.distance == UShapeletTransform.UED:
-                        output[i][s + nb_shapelet] = min_dist.err
+                    output[i][s + nb_shapelet] = min_dist.err
 
         return pd.DataFrame(output)
     
     def compute_uncertain_distance(self, uSeries1, uSeries2):
-        x = np.array([[o[0], o[1]] for o in uSeries1[0]])
-        y = np.array([[o[0], o[1]] for o in uSeries2[0]])
         if self.distance == UShapeletTransform.DUST_UNIFORM:
-            return self.dust_uniform(x, y)
-        if self.distance == UShapeletTransform.DUST_NORMAL:
-            return self.dust_normal(x, y)
-        if self.distance == UShapeletTransform.FOTS:
-        	return self.fots(x[:,0], y[:,0])
-        if self.distance == UShapeletTransform.UED:
-            return self.uncertain_euclidean_distance(x, y)
-        if self.distance == UShapeletTransform.HBD:
-            return self.hellinger_distance(x, y)
-        if self.distance == UShapeletTransform.JSD:
-            return self.jensen_shannon_distance(x, y)
-        return self.euclidean_distance(x[:, 0], y[:,0])
+            return UShapeletTransform.dust_uniform(uSeries1, uSeries2)
+        elif self.distance == self.DUST_NORMAL:
+            return self.dust_normal(uSeries1, uSeries2)
+        else:
+            return self.uncertain_euclidean_distance(uSeries1, uSeries2)
     
-    def hellinger_distance(self, uSeries1, uSeries2):
-        mu1, sigma1 = uSeries1[:, 0], uSeries1[:, 1]
-        mu2, sigma2 = uSeries2[:, 0], uSeries2[:, 1]
-        sum_sigma_squared = np.square(sigma1) + np.square(sigma2)
-        res = np.exp(-np.square(mu1 - mu2)/(4 * sum_sigma_squared))
-        res *= np.sqrt(2*sigma1*sigma2/sum_sigma_squared)
-        res = np.linalg.norm(1 - res)
-        return UNumber(res, 0, cmp_type=self.cmp_type)
-
-    def jensen_shannon_distance(self, uSeries1, uSeries2):
-        mu1, sigma1 = uSeries1[:, 0], uSeries1[:, 1]
-        mu2, sigma2 = uSeries2[:, 0], uSeries2[:, 1]
-        mu3 = (mu1 + mu2) / 2
-        sigma3_squared = (np.square(sigma1) + np.square(sigma2)) / 4
-        sigma3 = np.sqrt(sigma3_squared)
-        
-        D_kl_13 = np.log2(sigma3/sigma1) + (np.square(sigma1) + np.square(mu1 - mu3)) / (2 * sigma3_squared) - 0.5
-        D_kl_23 = np.log2(sigma3/sigma2) + (np.square(sigma2) + np.square(mu2 - mu3)) / (2 * sigma3_squared) - 0.5
-        
-        res = (np.linalg.norm(D_kl_13) + np.linalg.norm(D_kl_23)) / 2
-
-        return UNumber(res, 0, cmp_type=self.cmp_type)
-
     def uncertain_euclidean_distance(self, uSeries1, uSeries2):
         dist, err = 0, 0
-        for u, v in zip(uSeries1, uSeries2):
+        for u, v in zip(uSeries1[0], uSeries2[0]):
             tmp = np.abs(u[0]-v[0])
             dist += (tmp**2)
             err += (tmp * (u[1] + v[1]))
-            # print(u[1], v[1])
-
         return UNumber(dist, err, cmp_type=self.cmp_type)
-
-    def euclidean_distance(self, series1, series2):
-        dist = np.sum((series1 - series2)**2)
-            # print(u[1], v[1])
-
-        return UNumber(dist, 0, cmp_type=self.cmp_type)
-
-    def smoothed_euclidean_distance(self, series1, series2):
-        smoothed1 = SimpleExpSmoothing(pd.Series(series1)).fit().fittedvalues
-        smoothed2 = SimpleExpSmoothing(pd.Series(series2)).fit().fittedvalues
-
-        return self.euclidean_distance(smoothed1, smoothed2)
-
-    def autocoravariance_matrix(self, X, w, t, m = None, pad=0):
-        if m is None:
-            m = w
-        start = t - m + 1
-        gamma_t = np.zeros((w, w))
-        X_copy = X.copy()
-        pw = 0
-        if start < 0:
-            pw = -start
-            # padding with 0
-            X_copy = np.pad(X, pad_width=(pw, 0), constant_values=pad)
-        for tau in range(start-1, t):
-            s = tau + pw
-            gamma_t += np.outer(X_copy[s:s+w], X_copy[s:s+w])
-        return gamma_t
-
-    def fots(self, X, Y, t = None, w = None, k=4, m=None, pad=0):
-        if w is None:
-            w = len(X) // 2
-        if t is None:
-            t = len(X) // 2
-        if t+w > len(X):
-            w = t
-        gamma_Xt = self.autocoravariance_matrix(X, w, t, m, pad)
-        gamma_Yt = self.autocoravariance_matrix(Y, w, t, m, pad)
-        _, eigVectorX = np.linalg.eigh(gamma_Xt)
-        _, eigVectorY = np.linalg.eigh(gamma_Yt)
-        k = min(k, min(eigVectorX.shape[1], eigVectorY.shape[1]))
-        return UNumber(np.linalg.norm(eigVectorX[:,-k:] - eigVectorY[:,-k:], ord='fro'), err=0, cmp_type=self.cmp_type)
     
-    def dust_uniform(self, x, y):
-        err_std = np.max([y[:, 1], x[:, 1]], axis=0)
-        err_std[err_std==0] = 0.5
-        return UNumber(np.sqrt(np.sum((np.abs(x[:, 0] - y[:, 0])/(2*err_std))**2)), err=0, cmp_type=self.cmp_type)
+    def dust_uniform(self, series1, series2):
+        x = np.array([[o[0], o[1]] for o in series1])
+        y = np.array([[o[0], o[1]] for o in series2])
+        err_std = np.max([np.max(y[:, 1]), np.max(x[:, 1])])
+        return UNumber(np.sqrt(np.sum((np.abs(x - y)/(2*err_std))**2)), err=0, cmp_type=self.cmp_type)
 
-    def dust_normal(self, x, y):
-        err_std = np.max([y[:, 1], x[:, 1]], axis=0)
-        err_std[err_std==0] = 0.4238 # an approximation solution of 2x(1 + x^2) = 1
-        return UNumber(np.sqrt(np.sum((np.abs(x[:, 0] - y[:, 0]) / (2 * err_std * ( 1 + err_std**2)))**2)), err=0, cmp_type=self.cmp_type)
+    def dust_normal(self, series1, series2):
+        x = np.array([[o[0], o[1]] for o in series1])
+        y = np.array([[o[0], o[1]] for o in series2])
+        err_std = np.max([np.max(y[:, 1]), np.max(x[:, 1])])
+        return UNumber(np.sqrt(np.sum((np.abs(x - y) / (2 * err_std * ( 1 + err_std**2)))**2)), err=0, cmp_type=self.cmp_type)
 
 class ContractedUShapeletTransform(UShapeletTransform):
 
@@ -532,33 +416,64 @@ class ContractedUShapeletTransform(UShapeletTransform):
             verbose = 0,
             remove_self_similar = True,
             cmp_type = None,
-            distance = "ued",
-            predefined_ig_rejection_level = 0.05
+            distance = "ued"
     ):
 
-        super().__init__(min_shapelet_length, max_shapelet_length, max_shapelets_to_store_per_class, random_state,
-                         verbose, remove_self_similar)
-
-        self.predefined_ig_rejection_level = predefined_ig_rejection_level
         self.distance = distance
         self.cmp_type = cmp_type
         self.num_candidates_to_sample_per_case = num_candidates_to_sample_per_case
         self.time_limit_in_mins = time_limit_in_mins
+        self.predefined_ig_rejection_level = 0.05
         self.shapelets = None
+
+        super().__init__(min_shapelet_length, max_shapelet_length, max_shapelets_to_store_per_class, random_state,
+                         verbose, remove_self_similar)
+
+def build_ust_model(distance, seed=None, cmp_type=None, time_limit_in_mins=1):
+    ust = ContractedUShapeletTransform(time_limit_in_mins, 
+                                       remove_self_similar=True, 
+                                       random_state=seed, 
+                                       cmp_type=cmp_type,
+                                       distance=distance)
+
+    dt = DecisionTreeClassifier(random_state=seed)
+
+    shapelet_clf = Pipeline([('st', ust), ('dt', dt)])
+    return shapelet_clf
+
+def build_st_model(seed=None):
+    st = ContractedShapeletTransform(time_limit_in_mins=0.5, remove_self_similar=True, random_state=seed)
+
+    dt = DecisionTreeClassifier(random_state=seed)
+
+    shapelet_clf = Pipeline([('st', st), ('dt', dt)])
+    return shapelet_clf
+
+def build_and_run_model(name, 
+                        dataset_folder, 
+                        seed, 
+                        cmp_type=UNumber.SIMPLE_CMP,
+                        time_limit_in_mins=1,
+                        distance=UShapeletTransform.UED,
+                        return_model=False):
+    print(name, 'Started...')
+    start = time.time()
+    (train_X, train_y), (test_X, test_y) = ust_utils.load_uncertain_dataset(name, dataset_folder)
+    ust_clf = build_ust_model(cmp_type=cmp_type, distance=distance, seed=seed, time_limit_in_mins=time_limit_in_mins)
+    ust_clf.fit(train_X, train_y)
+    cp1 = time.time()
+    score = ust_clf.score(test_X, test_y)
+    cp2 = time.time()
+    train_duration = round(cp1 - start, 2)
+    test_duration = round(cp2 - cp1, 2)
+    print(name, f'Finished (took {train_duration + test_duration} seconds)')
+    if return_model:
+        return ust_clf, score, train_duration, test_duration
+    return score, train_duration, test_duration
     
 if __name__ == "__main__":
     u1 = [[(5, 0.2), (2, 0.01)]]
     u2 = [[(4, 0.1), (1, 0.3)]]
-    print(u1, u2)
-    print(f"ued(u1, u2)", UShapeletTransform().uncertain_euclidean_distance(u1, u2))
-    print(f"dust_uniform(u1, u2)", UShapeletTransform().dust_uniform(u1, u2))
-    print(f"dust_normal(u1, u2)", UShapeletTransform().dust_normal(u1, u2))
-
-    X = np.random.randint(-6, 5, size=(10, 6))
-    X = pd.DataFrame(data=X, columns=[f'c{i}' for i in range(X.shape[1])])
-    nc = X.shape[1]//2
-    m = X.iloc[:, 0:nc]
-    e = X.iloc[:, nc:]
-    U_X = np.array([ [[m.iloc[i,j], e.iloc[i,j]] for j in range(nc)] for i in range(X.shape[0])])
-    print("Original:\n",X)
-    print("Transfomed:\n", Flat2UncertainTransformer.transform(X))
+    print(UShapeletTransform().uncertain_euclidean_distance(u1, u2))
+    print(UShapeletTransform().dust_uniform(u1, u2))
+    print(UShapeletTransform().dust_normal(u1, u2))
