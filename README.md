@@ -1,10 +1,8 @@
-# ustc
+# Usage
 
-Uncertain time series classification
+Check the file  `u_shapelet.ipynb` for tutorial.
 
-check the file the  `u_shapelet.ipynb` for usage tutorial.
-
-### Dependencies
+# Dependencies
 
 - imbalanced-learn=0.7.0
 - numpy==1.19.5
