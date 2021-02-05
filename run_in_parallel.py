@@ -37,7 +37,7 @@ if __name__ == '__main__':
 
             # adding dust
             if not use_ugnb:
-                for dist in [UShapeletTransform.DUST_UNIFORM, UShapeletTransform.DUST_NORMAL, UShapeletTransform.ED]:
+                for dist in [UShapeletTransform.DUST_UNIFORM, UShapeletTransform.DUST_NORMAL, UShapeletTransform.ED,UShapeletTransform.JSD,UShapeletTransform.HBD,UShapeletTransform.SMOOTHED_ED]:
                     args.extend([(d, dataset_folder, SEED, UNumber.SIMPLE_CMP, time_limit_in_mins, dist, use_ugnb) for d in datasets]) 
             
             NB_PROCESS = min(len(args), cpu_count())
