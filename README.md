@@ -36,9 +36,11 @@ The datasets: [uncertain-dataset.tar.gz](./uncertain-dataset.tar.gz)
 
 ### Critical difference diagrams of models log loss (lower is better)
 
-- Low uncertainty
-- Medium uncertainty
-- High uncertainty
+|      | Low uncertainty                                              | Medium uncertainty                                           | High uncertainty                                             |
+| ---- | ------------------------------------------------------------ | ------------------------------------------------------------ | ------------------------------------------------------------ |
+| NB   | ![./images/CD_nb_losslog01.png](./images/CD_nb_losslog01.png) | ![./images/CD_nb_losslog06.png](./images/CD_nb_losslog06.png) | ![./images/CD_nb_losslog16.png](./images/CD_nb_losslog16.png) |
+| RF   | ![./images/CD_rf_losslog01.png](./images/CD_rf_losslog01.png) | ![./images/CD_rf_losslog06.png](./images/CD_rf_losslog06.png) | ![./images/CD_rf_losslog16.png](./images/CD_rf_losslog16.png) |
+| All  | ![./images/CD_losslog01.png](./images/CD_losslog01.png)      | ![./images/CD_losslog06.png](./images/CD_losslog06.png)      | ![./images/CD_losslog16.png](./images/CD_losslog16.png)      |
 
 # Dependencies
 
