@@ -12,25 +12,25 @@ The datasets: [uncertain-dataset.tar.gz](./uncertain-dataset.tar.gz)
 
 ### Critical difference diagrams of models accuracy rank(lower is better)
 
-|      | Low uncertainty                       | Medium uncertainty                    | High uncertainty                      |
-| ---- | ------------------------------------- | ------------------------------------- | ------------------------------------- |
-| NB   | ![](./images/CD_ust_models_nb_01.png) | ![](./images/CD_ust_models_nb_06.png) | ![](./images/CD_ust_models_nb_16.png) |
-| RF   | ![](./images/CD_ust_models_rf_01.png) | ![](./images/CD_ust_models_rf_06.png) | ![](./images/CD_ust_models_rf_16.png) |
-| All  | ![](./images/CD_ust_models01.png)     | ![](./images/CD_ust_models06.png)     | ![](./images/CD_ust_models16.png)     |
+|      | Low uncertainty                                              | Medium uncertainty                                           | High uncertainty                                             |
+| ---- | ------------------------------------------------------------ | ------------------------------------------------------------ | ------------------------------------------------------------ |
+| NB   | ![./images/CD_ust_models_nb_01.png](./images/CD_ust_models_nb_01.png) | ![./images/CD_ust_models_nb_06.png](./images/CD_ust_models_nb_06.png) | ![./images/CD_ust_models_nb_16.png](./images/CD_ust_models_nb_16.png) |
+| RF   | ![./images/CD_ust_models_rf_01.png](./images/CD_ust_models_rf_01.png) | ![./images/CD_ust_models_rf_06.png](./images/CD_ust_models_rf_06.png) | ![./images/CD_ust_models_rf_16.png](./images/CD_ust_models_rf_16.png) |
+| All  | ![./images/CD_ust_models01.png](./images/CD_ust_models01.png) | ![./images/CD_ust_models06.png](./images/CD_ust_models06.png) | ![./images/CD_ust_models16.png](./images/CD_ust_models16.png) |
 
 ### Accuracy scatter plots of UST(UED,RF)  vs others
 
 - Low uncertainty
 
-  ![](./images/scatter_ulevel01.png)
+  ![./images/scatter_ulevel01.png](./images/scatter_ulevel01.png)
 
 - Medium uncertainty 
 
-  ![](./images/scatter_ulevel16.png)
+  ![./images/scatter_ulevel16.png](./images/scatter_ulevel16.png)
 
 - High uncertainty
 
-  ![](./images/scatter_ulevel06.png)
+  ![./images/scatter_ulevel06.png](./images/scatter_ulevel06.png)
 
   
 
