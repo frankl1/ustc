@@ -48,3 +48,17 @@ The datasets: [uncertain-dataset.tar.gz](./uncertain-dataset.tar.gz)
 - numpy==1.19.5
 - pandas==1.2.0
 - sktime==0.5.1
+
+# Cite this work
+```
+@INPROCEEDINGS{mbouopda@2020,  
+  author={Mbouopda, Michael Franklin and Mephu Nguifo, Engelbert},  
+  booktitle={2020 International Conference on Data Mining Workshops (ICDMW)},   
+  title={Uncertain Time Series Classification with Shapelet Transform},   
+  year={2020},  
+  volume={},  
+  number={},  
+  pages={259-266},  
+  doi={10.1109/ICDMW51313.2020.00044}
+}
+```
